@@ -10,4 +10,4 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run ESC/POS command tests
-        run: bash tests/run.sh
+        run: make test
