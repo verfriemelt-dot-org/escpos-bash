@@ -88,3 +88,7 @@ Run the byte-output tests with:
 ```bash
 bash tests/run.sh
 ```
+
+## Links:
+
+ * https://download4.epson.biz/sec_pubs/pos/reference_en/escpos/commands.html
