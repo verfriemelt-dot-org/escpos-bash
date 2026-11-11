@@ -23,6 +23,8 @@ run_test raw/stdin_bytes.sh
 run_test command/control_tokens.sh
 run_test feed/feed_lines.sh
 run_test font/font_selection.sh
+run_test linespacing/set.sh
+run_test linespacing/reset.sh
 run_test speed/speed_selection.sh
 run_test speed/slowest_speed.sh
 run_test speed/default_speed.sh

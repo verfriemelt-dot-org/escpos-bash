@@ -14,6 +14,7 @@ help() {
         '  command TOKEN...  Translate control tokens (ESC, GS, etc.) to bytes.' \
         '  feed LINES        Feed 0-255 lines.' \
         '  font FONT         Select character font 0, 1, or 2.' \
+        '  linespacing [UNITS] Set line spacing in motion units; no value restores the default.' \
         '  speed SPEED       Select print speed: 0=printer default, 1-14.' \
         '  emphasize 0|1     Disable or enable emphasized printing.' \
         '  italic 0|1        Disable or enable italic printing (model-dependent).' \
@@ -64,6 +65,14 @@ validate_font() {
         0|1|2) printf -v font_byte '\\%03o' "$1" ;;
         *) fail 'font: value must be 0, 1, or 2' ;;
     esac
+}
+
+validate_line_spacing() {
+    local spacing=$1
+    [[ $spacing =~ ^[0-9]{1,3}$ ]] || fail 'linespacing: value must be an integer from 0 to 255'
+    spacing=$((10#$spacing))
+    ((spacing <= 255)) || fail 'linespacing: value must be an integer from 0 to 255'
+    printf -v line_spacing_byte '\\%03o' "$spacing"
 }
 
 validate_speed() {
@@ -141,6 +150,16 @@ font_command() {
     (($# == 1)) || usage
     validate_font "$1"
     raw escaped "\\033M${font_byte}"
+}
+
+line_spacing_command() {
+    (($# <= 1)) || usage
+    if (($# == 0)); then
+        raw escaped '\033\062'
+    else
+        validate_line_spacing "$1"
+        raw escaped "\\033\\063${line_spacing_byte}"
+    fi
 }
 
 speed_command() {
@@ -298,6 +317,7 @@ run_queue() {
                 command) command_command "${queued_arguments[@]:start:length}" ;;
                 feed)   feed_command "${queued_arguments[@]:start:length}" ;;
                 font)   font_command "${queued_arguments[@]:start:length}" ;;
+                linespacing) line_spacing_command "${queued_arguments[@]:start:length}" ;;
                 speed)  speed_command "${queued_arguments[@]:start:length}" ;;
                 emphasize) emphasize_command "${queued_arguments[@]:start:length}" ;;
                 italic) italic_command "${queued_arguments[@]:start:length}" ;;
@@ -399,6 +419,7 @@ main() {
         command)  enqueue_command 4 command "${command_args[@]}" ;;
         feed)     enqueue_command 4 feed "${command_args[@]}" ;;
         font)     enqueue_command 4 font "${command_args[@]}" ;;
+        linespacing) enqueue_command 4 linespacing "${command_args[@]}" ;;
         speed)    enqueue_command 4 speed "${command_args[@]}" ;;
         emphasize) enqueue_command 4 emphasize "${command_args[@]}" ;;
         italic)   enqueue_command 4 italic "${command_args[@]}" ;;
@@ -420,6 +441,12 @@ main() {
         font)
             ((${#command_args[@]} == 1)) || usage
             validate_font "${command_args[0]}"
+            ;;
+        linespacing)
+            ((${#command_args[@]} <= 1)) || usage
+            if ((${#command_args[@]})); then
+                validate_line_spacing "${command_args[0]}"
+            fi
             ;;
         speed)
             ((${#command_args[@]} == 1)) || usage

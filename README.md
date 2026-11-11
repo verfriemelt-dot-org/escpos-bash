@@ -9,7 +9,7 @@ PRINTER=/dev/usb/lp1 ./escpos print "Hello, printer"
 printf 'Hello from stdin\n' | PRINTER=/dev/usb/lp1 ./escpos print
 ```
 
-Commands include `init`, `feed LINES`, `font 0|1|2`, `speed 0-14` (0 restores the printer default; 1 is slowest and 14 fastest on the TM-T88V), `emphasize 0|1`, `italic 0|1` (model support varies), `underline 0|1|2`, `align left|center|right`, `barcode DATA` (Code 39), `qrcode DATA` (Model 2, size 6, error correction L), `cut [LINES]` (feed the requested number of lines, 6 by default, then full cut), and `status` (prints the printer status page on compatible Epson models). `command` translates control tokens such as `ESC @` and `ESC E 1`; `raw` sends supplied bytes unchanged:
+Commands include `init`, `feed LINES`, `font 0|1|2`, `linespacing [UNITS]` (0-255 motion units; no value restores the printer default), `speed 0-14` (0 restores the printer default; 1 is slowest and 14 fastest on the TM-T88V), `emphasize 0|1`, `italic 0|1` (model support varies), `underline 0|1|2`, `align left|center|right`, `barcode DATA` (Code 39), `qrcode DATA` (Model 2, size 6, error correction L), `cut [LINES]` (feed the requested number of lines, 6 by default, then full cut), and `status` (prints the printer status page on compatible Epson models). `command` translates control tokens such as `ESC @` and `ESC E 1`; `raw` sends supplied bytes unchanged:
 
 Print speed is model-dependent and can be limited by the printer's print-control mode and operating conditions. If a level near the configured maximum appears to have no effect, try a lower level such as `speed 1`; use `speed 0` to restore the printer's configured default.
 
@@ -32,18 +32,25 @@ The shop, transaction, and tax figures are illustrative. On the TM-T88V with 80 
 export PRINTER=/dev/usb/lp5
 ./escpos init
 ./escpos speed 1
-./escpos --align center barcode ACME1042
+./escpos align center
+./escpos barcode ACME1042
 ./escpos feed 1
-./escpos --emphasize 1 --font 1 print <<'EOF'
-  __ _  ___ _ __ ___   ___
- / _` |/ __| '_ ` _ \ / _ \
-| (_| | (__| | | | | |  __/
- \__,_|\___|_| |_| |_|\___|
+./escpos linespacing 0
+./escpos --font 1 print <<'EOF'
+                                _                  
+                               | |                
+  __ _  ___ _ __ ___   ___  ___| |__   ___  _ __  
+ / _` |/ __| '_ ` _ \ / _ \/ __| '_ \ / _ \| '_ \ 
+| (_| | (__| | | | | |  __/\__ \ | | | (_) | |_) |
+ \__,_|\___|_| |_| |_|\___||___/_| |_|\___/| .__/ 
+                                           | |    
+                                           |_|    
 EOF
-./escpos emphasize 0
+./escpos linespacing 40
 ./escpos print '42 Market Street'
 ./escpos print '10115 Berlin | +49 30 555 1042'
 ./escpos print 'VAT ID: DE123456789'
+./escpos font 0
 ./escpos align left
 ./escpos print '------------------------------------------'
 ./escpos font 1
@@ -72,10 +79,10 @@ printf '%-29s %12s\n' 'Cash received' '20.00 EUR' \
 
 ./escpos feed 1
 ./escpos align center
-./escpos emphasize 1
-./escpos print 'Thank you for shopping at ACME!'
 ./escpos emphasize 0
 ./escpos qrcode 'https://example.com/receipts/1042'
+./escpos emphasize 1
+./escpos print 'Thank you for shopping at ACME!'
 ./escpos cut 8
 ```
 
