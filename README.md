@@ -92,3 +92,4 @@ bash tests/run.sh
 ## Links:
 
  * https://download4.epson.biz/sec_pubs/pos/reference_en/escpos/commands.html
+ * https://download4.epson.biz/sec_pubs/pos/reference_en/escpos/tmt88v.html
