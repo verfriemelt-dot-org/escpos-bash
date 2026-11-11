@@ -14,7 +14,14 @@ help() {
         '  command TOKEN...  Translate control tokens (ESC, GS, etc.) to bytes.' \
         '  feed LINES        Feed 0-255 lines.' \
         '  font FONT         Select character font 0, 1, or 2.' \
-        '  cut               Perform a full paper cut.' \
+        '  speed SPEED       Select print speed: 0=printer default, 1-14.' \
+        '  emphasize 0|1     Disable or enable emphasized printing.' \
+        '  italic 0|1        Disable or enable italic printing (model-dependent).' \
+        '  underline 0|1|2   Disable, single, or double underline.' \
+        '  align ALIGN      Set text alignment: left, center, or right.' \
+        '  barcode DATA     Print a Code 39 barcode with text below.' \
+        '  qrcode DATA      Print a Model 2 QR code (size 6, error correction L).' \
+        '  cut [LINES]        Feed before a full cut (default: 6 lines).' \
         '  init               Initialize the printer (ESC @).' \
         '  status             Print the printer status report on paper.' \
         '  --help            Show this help.' \
@@ -22,6 +29,10 @@ help() {
         'Global options (can appear before or after the command):' \
         '  --init,        -i        Initialize before the command.' \
         '  --feed-before, -b LINES  Feed before the command.' \
+        '  --align ALIGN            Set alignment before the command.' \
+        '  --emphasize 0|1          Set emphasized printing before the command.' \
+        '  --italic 0|1             Set italic printing before the command.' \
+        '  --underline 0|1|2        Set underline mode before the command.' \
         '  --feed-after,  -a LINES  Feed after the command.' \
         '  --cut,         -c        Cut after the command.' \
         '  --font,        -f FONT   Select font before the command.' \
@@ -41,10 +52,10 @@ fail() {
 }
 
 validate_feed_count() {
-    local count=$1
-    [[ $count =~ ^[0-9]{1,3}$ ]] || fail 'feed: line count must be an integer from 0 to 255'
+    local count=$1 label=${2:-feed}
+    [[ $count =~ ^[0-9]{1,3}$ ]] || fail "$label: line count must be an integer from 0 to 255"
     count=$((10#$count))
-    ((count <= 255)) || fail 'feed: line count must be an integer from 0 to 255'
+    ((count <= 255)) || fail "$label: line count must be an integer from 0 to 255"
     printf -v feed_byte '\\%03o' "$count"
 }
 
@@ -53,6 +64,67 @@ validate_font() {
         0|1|2) printf -v font_byte '\\%03o' "$1" ;;
         *) fail 'font: value must be 0, 1, or 2' ;;
     esac
+}
+
+validate_speed() {
+    local speed=$1
+    [[ $speed =~ ^[0-9]{1,2}$ ]] || fail 'speed: value must be an integer from 0 to 14'
+    speed=$((10#$speed))
+    ((speed <= 14)) || fail 'speed: value must be an integer from 0 to 14'
+    printf -v speed_byte '\\%03o' "$speed"
+}
+
+validate_emphasis() {
+    case $1 in
+        0|1) printf -v emphasis_byte '\\%03o' "$1" ;;
+        *) fail 'emphasize: value must be 0 or 1' ;;
+    esac
+}
+
+validate_italic() {
+    case $1 in
+        0|1) ;;
+        *) fail 'italic: value must be 0 or 1' ;;
+    esac
+}
+
+validate_underline() {
+    case $1 in
+        0|1|2) printf -v underline_byte '\\%03o' "$1" ;;
+        *) fail 'underline: value must be 0, 1, or 2' ;;
+    esac
+}
+
+validate_alignment() {
+    case $1 in
+        left)   printf -v alignment_byte '\\%03o' 0 ;;
+        center) printf -v alignment_byte '\\%03o' 1 ;;
+        right)  printf -v alignment_byte '\\%03o' 2 ;;
+        *) fail 'align: value must be left, center, or right' ;;
+    esac
+}
+
+validate_barcode_data() {
+    local LC_ALL=C
+    local data=$1
+    local length=${#data}
+    local code39_pattern='^[A-Z0-9 $%+./-]+$'
+
+    ((length >= 1 && length <= 255)) || fail 'barcode: data must be 1-255 Code 39 characters'
+    [[ $data =~ $code39_pattern ]] || fail 'barcode: data contains unsupported Code 39 characters'
+    printf -v barcode_length '\\%03o' "$length"
+}
+
+validate_qrcode_data() {
+    local LC_ALL=C
+    local data=$1
+    local length=${#data}
+    local store_length
+
+    ((length >= 1 && length <= 65532)) || fail 'qrcode: data must be 1-65532 bytes'
+    store_length=$((length + 3))
+    printf -v qr_length_low '\\%03o' "$((store_length & 255))"
+    printf -v qr_length_high '\\%03o' "$((store_length >> 8))"
 }
 
 open_printer() {
@@ -71,8 +143,71 @@ font_command() {
     raw escaped "\\033M${font_byte}"
 }
 
+speed_command() {
+    (($# == 1)) || usage
+    validate_speed "$1"
+    raw escaped "\\035(K\\002\\000\\062${speed_byte}"
+}
+
+emphasize_command() {
+    (($# == 1)) || usage
+    validate_emphasis "$1"
+    raw escaped "\\033E${emphasis_byte}"
+}
+
+italic_command() {
+    (($# == 1)) || usage
+    validate_italic "$1"
+    if [[ $1 == 1 ]]; then
+        raw escaped '\033\064'
+    else
+        raw escaped '\033\065'
+    fi
+}
+
+underline_command() {
+    (($# == 1)) || usage
+    validate_underline "$1"
+    raw escaped "\\033-${underline_byte}"
+}
+
+align_command() {
+    (($# == 1)) || usage
+    validate_alignment "$1"
+    raw escaped "\\033a${alignment_byte}"
+}
+
+barcode_command() {
+    (($# == 1)) || usage
+    validate_barcode_data "$1"
+    raw escaped "\\035h\\120\\035w\\002\\035H\\002\\035k\\105${barcode_length}"
+    raw direct "$1"
+}
+
+qrcode_command() {
+    (($# == 1)) || usage
+    validate_qrcode_data "$1"
+
+    raw escaped '\035(k\004\000'
+    raw direct '1A2'
+    raw escaped '\000'
+    raw escaped '\035(k\003\000'
+    raw direct '1C'
+    raw escaped '\006'
+    raw escaped '\035(k\003\000'
+    raw direct '1E0'
+    raw escaped "\\035(k${qr_length_low}${qr_length_high}"
+    raw direct '1P0'
+    raw direct "$1"
+    raw escaped '\035(k\003\000'
+    raw direct '1Q0'
+}
+
 cut_command() {
-    (($# == 0)) || usage
+    (($# <= 1)) || usage
+    local lines=${1:-6}
+    validate_feed_count "$lines" cut
+    feed_command "$lines"
     raw escaped '\035V\000'
 }
 
@@ -152,7 +287,7 @@ enqueue_command() {
 
 run_queue() {
     local phase index start length
-    for phase in 0 1 2 3 4 5; do
+    for phase in 0 1 2 3 4 5 6; do
         for ((index = 0; index < ${#queued_commands[@]}; index++)); do
             [[ ${queued_phases[index]} == "$phase" ]] || continue
             start=${queued_starts[index]}
@@ -163,6 +298,13 @@ run_queue() {
                 command) command_command "${queued_arguments[@]:start:length}" ;;
                 feed)   feed_command "${queued_arguments[@]:start:length}" ;;
                 font)   font_command "${queued_arguments[@]:start:length}" ;;
+                speed)  speed_command "${queued_arguments[@]:start:length}" ;;
+                emphasize) emphasize_command "${queued_arguments[@]:start:length}" ;;
+                italic) italic_command "${queued_arguments[@]:start:length}" ;;
+                underline) underline_command "${queued_arguments[@]:start:length}" ;;
+                align) align_command "${queued_arguments[@]:start:length}" ;;
+                barcode) barcode_command "${queued_arguments[@]:start:length}" ;;
+                qrcode) qrcode_command "${queued_arguments[@]:start:length}" ;;
                 cut)    cut_command "${queued_arguments[@]:start:length}" ;;
                 init)   init_command "${queued_arguments[@]:start:length}" ;;
                 status) status_command "${queued_arguments[@]:start:length}" ;;
@@ -190,14 +332,38 @@ main() {
                 validate_feed_count "$1"
                 enqueue_command 1 feed "$1"
                 ;;
+            --align)
+                (($# >= 2)) || usage
+                shift
+                validate_alignment "$1"
+                enqueue_command 2 align "$1"
+                ;;
+            --emphasize)
+                (($# >= 2)) || usage
+                shift
+                validate_emphasis "$1"
+                enqueue_command 3 emphasize "$1"
+                ;;
+            --italic)
+                (($# >= 2)) || usage
+                shift
+                validate_italic "$1"
+                enqueue_command 3 italic "$1"
+                ;;
+            --underline)
+                (($# >= 2)) || usage
+                shift
+                validate_underline "$1"
+                enqueue_command 3 underline "$1"
+                ;;
             --feed-after|-a)
                 (($# >= 2)) || usage
                 shift
                 validate_feed_count "$1"
-                enqueue_command 4 feed "$1"
+                enqueue_command 5 feed "$1"
                 ;;
             --cut|-c)
-                enqueue_command 5 cut
+                enqueue_command 6 cut
                 ;;
             --init|-i)
                 enqueue_command 0 init
@@ -206,7 +372,7 @@ main() {
                 (($# >= 2)) || usage
                 shift
                 validate_font "$1"
-                enqueue_command 2 font "$1"
+                enqueue_command 3 font "$1"
                 ;;
             --)
                 shift
@@ -228,14 +394,21 @@ main() {
     [[ -n $command ]] || usage
 
     case $command in
-        print)    enqueue_command 3 print "${command_args[@]}" ;;
-        raw)      enqueue_command 3 raw "${command_args[@]}" ;;
-        command)  enqueue_command 3 command "${command_args[@]}" ;;
-        feed)     enqueue_command 3 feed "${command_args[@]}" ;;
-        font)     enqueue_command 3 font "${command_args[@]}" ;;
-        cut)      enqueue_command 3 cut "${command_args[@]}" ;;
-        init)     enqueue_command 3 init "${command_args[@]}" ;;
-        status)   enqueue_command 3 status "${command_args[@]}" ;;
+        print)    enqueue_command 4 print "${command_args[@]}" ;;
+        raw)      enqueue_command 4 raw "${command_args[@]}" ;;
+        command)  enqueue_command 4 command "${command_args[@]}" ;;
+        feed)     enqueue_command 4 feed "${command_args[@]}" ;;
+        font)     enqueue_command 4 font "${command_args[@]}" ;;
+        speed)    enqueue_command 4 speed "${command_args[@]}" ;;
+        emphasize) enqueue_command 4 emphasize "${command_args[@]}" ;;
+        italic)   enqueue_command 4 italic "${command_args[@]}" ;;
+        underline) enqueue_command 4 underline "${command_args[@]}" ;;
+        align)    enqueue_command 4 align "${command_args[@]}" ;;
+        barcode)  enqueue_command 4 barcode "${command_args[@]}" ;;
+        qrcode)   enqueue_command 4 qrcode "${command_args[@]}" ;;
+        cut)      enqueue_command 4 cut "${command_args[@]}" ;;
+        init)     enqueue_command 4 init "${command_args[@]}" ;;
+        status)   enqueue_command 4 status "${command_args[@]}" ;;
         *)       usage ;;
     esac
 
@@ -248,10 +421,42 @@ main() {
             ((${#command_args[@]} == 1)) || usage
             validate_font "${command_args[0]}"
             ;;
+        speed)
+            ((${#command_args[@]} == 1)) || usage
+            validate_speed "${command_args[0]}"
+            ;;
+        emphasize)
+            ((${#command_args[@]} == 1)) || usage
+            validate_emphasis "${command_args[0]}"
+            ;;
+        italic)
+            ((${#command_args[@]} == 1)) || usage
+            validate_italic "${command_args[0]}"
+            ;;
+        underline)
+            ((${#command_args[@]} == 1)) || usage
+            validate_underline "${command_args[0]}"
+            ;;
+        align)
+            ((${#command_args[@]} == 1)) || usage
+            validate_alignment "${command_args[0]}"
+            ;;
+        barcode)
+            ((${#command_args[@]} == 1)) || usage
+            validate_barcode_data "${command_args[0]}"
+            ;;
+        qrcode)
+            ((${#command_args[@]} == 1)) || usage
+            validate_qrcode_data "${command_args[0]}"
+            ;;
         command)
             ((${#command_args[@]})) || usage
             ;;
-        cut|init|status)
+        cut)
+            ((${#command_args[@]} <= 1)) || usage
+            validate_feed_count "${command_args[0]:-6}" cut
+            ;;
+        init|status)
             ((${#command_args[@]} == 0)) || usage
             ;;
     esac

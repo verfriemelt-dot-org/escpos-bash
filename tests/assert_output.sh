@@ -12,17 +12,23 @@ run_output_command() {
 
 assert_output() {
     local description=$1 expected=$2 input_mode=$3 input_data=$4
+    local failed=0
     shift 4
 
+    printf 'Testing %s...' "$description"
     if run_output_command "$input_mode" "$input_data" "$@" |
         cmp <(printf '%b' "$expected") - >/dev/null 2>&1; then
-        return 0
+        printf '  PASS\n'
+    else
+        printf '  FAIL\n' >&2
+        failed=1
     fi
 
-    printf 'FAIL: %s\n' "$description" >&2
-    printf 'Expected bytes (hex and character view):\n' >&2
-    printf '%b' "$expected" | od -An -tx1c >&2
-    printf 'Received bytes (hex and character view):\n' >&2
-    run_output_command "$input_mode" "$input_data" "$@" | od -An -tx1c >&2
-    return 1
+    if ((failed)) || [[ ${ESC_POS_TEST_RUNNER:-0} != 1 ]]; then
+        printf 'Expected bytes (hex and character view):\n' >&2
+        printf '%b' "$expected" | od -An -tx1c >&2
+        printf 'Actual bytes (hex and character view):\n' >&2
+        run_output_command "$input_mode" "$input_data" "$@" | od -An -tx1c >&2
+    fi
+    return "$failed"
 }
