@@ -6,7 +6,7 @@ if [[ ! -t 0 ]]; then
     exit 1
 fi
 
-source ../escpos
+source "$(dirname "$0")"/../escpos
 
 saved_stty=$(stty -g)
 restore_terminal() {

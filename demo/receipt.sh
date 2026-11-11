@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 
-source ../escpos
-
-PRINTER=/dev/usb/lp5
+source "$(dirname "$0")"/../escpos
 
 escpos init
 escpos speed 1
@@ -30,7 +28,7 @@ escpos print '------------------------------------------'
 escpos font 1
 escpos print 'Receipt: 1042'
 escpos print 'Date: 2026-11-11 10:42 | Cashier: Alex'
-escpos print '------------------------------------------------------'
+escpos print '--------------------------------------------------------'
 printf '%-4s %-30s %8s %11s\n' 'QTY' 'ITEM' 'UNIT' 'TOTAL' \
     '2' 'Coffee' '2.90' '5.80' \
     '1' 'Sourdough bread' '3.49' '3.49' \
