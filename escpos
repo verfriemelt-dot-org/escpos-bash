@@ -1,0 +1,263 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+printer=${PRINTER:-/dev/usb/lp1}
+printer_fd=
+
+help() {
+    printf '%s\n' \
+        "Usage: PRINTER=/dev/usb/lp1 ${0##*/} [OPTIONS] COMMAND [ARGS...]" \
+        '' \
+        'Commands:' \
+        '  print [text ...]  Print arguments joined by spaces, or read stdin.' \
+        '  raw [bytes ...]   Send bytes verbatim, or read stdin.' \
+        '  command TOKEN...  Translate control tokens (ESC, GS, etc.) to bytes.' \
+        '  feed LINES        Feed 0-255 lines.' \
+        '  font FONT         Select character font 0, 1, or 2.' \
+        '  cut               Perform a full paper cut.' \
+        '  init               Initialize the printer (ESC @).' \
+        '  status             Print the printer status report on paper.' \
+        '  --help            Show this help.' \
+        '' \
+        'Global options (can appear before or after the command):' \
+        '  --init,        -i        Initialize before the command.' \
+        '  --feed-before, -b LINES  Feed before the command.' \
+        '  --feed-after,  -a LINES  Feed after the command.' \
+        '  --cut,         -c        Cut after the command.' \
+        '  --font,        -f FONT   Select font before the command.' \
+        '  --                         Stop parsing options; pass remaining arguments literally.' \
+        '' \
+        'Raw control tokens: ESC GS FS DLE NUL SO SI LF CR FF HT.'
+}
+
+usage() {
+    help >&2
+    exit 2
+}
+
+fail() {
+    printf '%s\n' "$*" >&2
+    exit 2
+}
+
+validate_feed_count() {
+    local count=$1
+    [[ $count =~ ^[0-9]{1,3}$ ]] || fail 'feed: line count must be an integer from 0 to 255'
+    count=$((10#$count))
+    ((count <= 255)) || fail 'feed: line count must be an integer from 0 to 255'
+    printf -v feed_byte '\\%03o' "$count"
+}
+
+validate_font() {
+    case $1 in
+        0|1|2) printf -v font_byte '\\%03o' "$1" ;;
+        *) fail 'font: value must be 0, 1, or 2' ;;
+    esac
+}
+
+open_printer() {
+    exec {printer_fd}>"$printer"
+}
+
+feed_command() {
+    (($# == 1)) || usage
+    validate_feed_count "$1"
+    raw escaped "\\033d${feed_byte}"
+}
+
+font_command() {
+    (($# == 1)) || usage
+    validate_font "$1"
+    raw escaped "\\033M${font_byte}"
+}
+
+cut_command() {
+    (($# == 0)) || usage
+    raw escaped '\035V\000'
+}
+
+init_command() {
+    (($# == 0)) || usage
+    raw escaped '\033@'
+}
+
+status_command() {
+    (($# == 0)) || usage
+    raw escaped '\033@\035(A\002\000\001\002'
+}
+
+raw() {
+    local mode=$1
+    shift
+    case $mode in
+        direct)  printf '%s' "$@" >&"$printer_fd" ;;
+        escaped) printf '%b' "$@" >&"$printer_fd" ;;
+        *)       fail "raw: unknown internal mode \"$mode\"" ;;
+    esac
+}
+
+raw_command() {
+    local data
+    if (($#)); then
+        raw direct "$@"
+    else
+        data=
+        IFS= read -r -d '' data || :
+        raw direct "$data"
+    fi
+}
+
+command_command() {
+    (($#)) || usage
+    for token do
+        case $token in
+            ESC) raw escaped '\033' ;;
+            GS)  raw escaped '\035' ;;
+            FS)  raw escaped '\034' ;;
+            DLE) raw escaped '\020' ;;
+            NUL) raw escaped '\000' ;;
+            SO)  raw escaped '\016' ;;
+            SI)  raw escaped '\017' ;;
+            LF)  raw escaped '\012' ;;
+            CR)  raw escaped '\015' ;;
+            FF)  raw escaped '\014' ;;
+            HT)  raw escaped '\011' ;;
+            *)   raw direct "$token" ;;
+        esac
+    done
+}
+
+print_command() {
+    local text
+    if (($#)); then
+        text=$*
+    else
+        text=
+        IFS= read -r -d '' text || :
+    fi
+
+    raw direct "$text"
+    [[ $text == *$'\n' ]] || raw escaped '\n'
+}
+
+enqueue_command() {
+    local phase=$1 name=$2
+    shift 2
+    queued_phases+=("$phase")
+    queued_commands+=("$name")
+    queued_starts+=("${#queued_arguments[@]}")
+    queued_lengths+=("$#")
+    queued_arguments+=("$@")
+}
+
+run_queue() {
+    local phase index start length
+    for phase in 0 1 2 3 4 5; do
+        for ((index = 0; index < ${#queued_commands[@]}; index++)); do
+            [[ ${queued_phases[index]} == "$phase" ]] || continue
+            start=${queued_starts[index]}
+            length=${queued_lengths[index]}
+            case ${queued_commands[index]} in
+                print)  print_command "${queued_arguments[@]:start:length}" ;;
+                raw)    raw_command "${queued_arguments[@]:start:length}" ;;
+                command) command_command "${queued_arguments[@]:start:length}" ;;
+                feed)   feed_command "${queued_arguments[@]:start:length}" ;;
+                font)   font_command "${queued_arguments[@]:start:length}" ;;
+                cut)    cut_command "${queued_arguments[@]:start:length}" ;;
+                init)   init_command "${queued_arguments[@]:start:length}" ;;
+                status) status_command "${queued_arguments[@]:start:length}" ;;
+            esac
+        done
+    done
+}
+
+main() {
+    if [[ ${1-} == --help ]]; then
+        (($# == 1)) || usage
+        help
+        return
+    fi
+
+    local command=
+    local -a command_args=()
+    local -a queued_phases=() queued_commands=() queued_starts=() queued_lengths=() queued_arguments=()
+
+    while (($#)); do
+        case $1 in
+            --feed-before|-b)
+                (($# >= 2)) || usage
+                shift
+                validate_feed_count "$1"
+                enqueue_command 1 feed "$1"
+                ;;
+            --feed-after|-a)
+                (($# >= 2)) || usage
+                shift
+                validate_feed_count "$1"
+                enqueue_command 4 feed "$1"
+                ;;
+            --cut|-c)
+                enqueue_command 5 cut
+                ;;
+            --init|-i)
+                enqueue_command 0 init
+                ;;
+            --font|-f)
+                (($# >= 2)) || usage
+                shift
+                validate_font "$1"
+                enqueue_command 2 font "$1"
+                ;;
+            --)
+                shift
+                [[ -n $command ]] || usage
+                command_args+=("$@")
+                break
+                ;;
+            *)
+                if [[ -z $command ]]; then
+                    command=$1
+                else
+                    command_args+=("$1")
+                fi
+                ;;
+        esac
+        shift
+    done
+
+    [[ -n $command ]] || usage
+
+    case $command in
+        print)    enqueue_command 3 print "${command_args[@]}" ;;
+        raw)      enqueue_command 3 raw "${command_args[@]}" ;;
+        command)  enqueue_command 3 command "${command_args[@]}" ;;
+        feed)     enqueue_command 3 feed "${command_args[@]}" ;;
+        font)     enqueue_command 3 font "${command_args[@]}" ;;
+        cut)      enqueue_command 3 cut "${command_args[@]}" ;;
+        init)     enqueue_command 3 init "${command_args[@]}" ;;
+        status)   enqueue_command 3 status "${command_args[@]}" ;;
+        *)       usage ;;
+    esac
+
+    case $command in
+        feed)
+            ((${#command_args[@]} == 1)) || usage
+            validate_feed_count "${command_args[0]}"
+            ;;
+        font)
+            ((${#command_args[@]} == 1)) || usage
+            validate_font "${command_args[0]}"
+            ;;
+        command)
+            ((${#command_args[@]})) || usage
+            ;;
+        cut|init|status)
+            ((${#command_args[@]} == 0)) || usage
+            ;;
+    esac
+
+    open_printer
+    run_queue
+}
+
+main "$@"
