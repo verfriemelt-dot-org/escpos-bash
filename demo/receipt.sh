@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-source escpos
+source ../escpos
 
 PRINTER=/dev/usb/lp5
 
