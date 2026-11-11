@@ -14,6 +14,7 @@ help() {
         '  speed SPEED          Select print speed: 0=printer default, 1-14.' \
         '  emphasize 0|1        Disable or enable emphasized printing.' \
         '  italic 0|1           Disable or enable italic printing (model-dependent).' \
+        '  reverse 0|1          Disable or enable white/black reverse printing.' \
         '  underline 0|1|2      Disable, single, or double underline.' \
         '  align ALIGN          Set text alignment: left, center, or right.' \
         '  barcode DATA         Print a Code 39 barcode with text below.' \
@@ -90,6 +91,13 @@ validate_italic() {
     case $1 in
         0|1) ;;
         *) fail 'italic: value must be 0 or 1' ;;
+    esac
+}
+
+validate_reverse() {
+    case $1 in
+        0|1) printf -v reverse_byte '\\%03o' "$1" ;;
+        *) fail 'reverse: value must be 0 or 1' ;;
     esac
 }
 
@@ -178,6 +186,12 @@ italic_command() {
     else
         raw escaped '\033\065'
     fi
+}
+
+reverse_command() {
+    (($# == 1)) || usage
+    validate_reverse "$1"
+    raw escaped "\\035B${reverse_byte}"
 }
 
 underline_command() {
@@ -317,6 +331,7 @@ run_queue() {
                 speed)  speed_command "${queued_arguments[@]:start:length}" ;;
                 emphasize) emphasize_command "${queued_arguments[@]:start:length}" ;;
                 italic) italic_command "${queued_arguments[@]:start:length}" ;;
+                reverse) reverse_command "${queued_arguments[@]:start:length}" ;;
                 underline) underline_command "${queued_arguments[@]:start:length}" ;;
                 align) align_command "${queued_arguments[@]:start:length}" ;;
                 barcode) barcode_command "${queued_arguments[@]:start:length}" ;;
@@ -419,6 +434,7 @@ main() {
         speed)    enqueue_command 4 speed "${command_args[@]}" ;;
         emphasize) enqueue_command 4 emphasize "${command_args[@]}" ;;
         italic)   enqueue_command 4 italic "${command_args[@]}" ;;
+        reverse)  enqueue_command 4 reverse "${command_args[@]}" ;;
         underline) enqueue_command 4 underline "${command_args[@]}" ;;
         align)    enqueue_command 4 align "${command_args[@]}" ;;
         barcode)  enqueue_command 4 barcode "${command_args[@]}" ;;
