@@ -9,7 +9,7 @@ PRINTER=/dev/usb/lp1 ./escpos print "Hello, printer"
 printf 'Hello from stdin\n' | PRINTER=/dev/usb/lp1 ./escpos print
 ```
 
-Global options can be placed before or after the command: `--init`/`-i`, `--feed-before LINES`/`-b`, `--align ALIGN`, `--emphasize 0|1`, `--italic 0|1`, `--underline 0|1|2`, `--font FONT`/`-f`, `--feed-after LINES`/`-a`, and `--cut`/`-c`. Alignment, emphasis, italic, underline, and font options are applied before the command, regardless of where they appear. For example:
+Global options can be placed before or after the command:
 
 ```bash
 printf 'Receipt\n' | PRINTER=/dev/usb/lp1 ./escpos --feed-before 2 print --feed-after 4 --cut
@@ -17,7 +17,7 @@ printf 'Receipt\n' | PRINTER=/dev/usb/lp1 ./escpos --feed-before 2 print --feed-
 
 ## ACME Shop receipt example
 
-The shop, transaction, and tax figures are illustrative. On the TM-T88V with 80 mm paper, Font 0 fits 42 characters per line and Font 1 fits 56. This example uses Font 1 for the item table and Font 0 for the rest. It prints a centered Code 39 barcode and QR code:
+On my TM-T88V with 80 mm paper, Font 0 fits 42 characters per line and Font 1 fits 56.
 
 <p align="center">
   <img src="img/demo.png" alt="Printed ACME Shop receipt">
