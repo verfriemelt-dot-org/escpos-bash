@@ -429,61 +429,6 @@ main() {
         *)       usage ;;
     esac
 
-    case $command in
-        feed)
-            ((${#command_args[@]} == 1)) || usage
-            validate_feed_count "${command_args[0]}"
-            ;;
-        font)
-            ((${#command_args[@]} == 1)) || usage
-            validate_font "${command_args[0]}"
-            ;;
-        linespacing)
-            ((${#command_args[@]} <= 1)) || usage
-            if ((${#command_args[@]})); then
-                validate_line_spacing "${command_args[0]}"
-            fi
-            ;;
-        speed)
-            ((${#command_args[@]} == 1)) || usage
-            validate_speed "${command_args[0]}"
-            ;;
-        emphasize)
-            ((${#command_args[@]} == 1)) || usage
-            validate_emphasis "${command_args[0]}"
-            ;;
-        italic)
-            ((${#command_args[@]} == 1)) || usage
-            validate_italic "${command_args[0]}"
-            ;;
-        underline)
-            ((${#command_args[@]} == 1)) || usage
-            validate_underline "${command_args[0]}"
-            ;;
-        align)
-            ((${#command_args[@]} == 1)) || usage
-            validate_alignment "${command_args[0]}"
-            ;;
-        barcode)
-            ((${#command_args[@]} == 1)) || usage
-            validate_barcode_data "${command_args[0]}"
-            ;;
-        qrcode)
-            ((${#command_args[@]} == 1)) || usage
-            validate_qrcode_data "${command_args[0]}"
-            ;;
-        command)
-            ((${#command_args[@]})) || usage
-            ;;
-        cut)
-            ((${#command_args[@]} <= 1)) || usage
-            validate_feed_count "${command_args[0]:-6}" cut
-            ;;
-        init|status)
-            ((${#command_args[@]} == 0)) || usage
-            ;;
-    esac
-
     open_printer
     run_queue
 }

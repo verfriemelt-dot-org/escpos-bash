@@ -9,7 +9,7 @@ escpos speed 1
 escpos align center
 escpos barcode ACME1042
 escpos feed 1
-escpos linespacing 0
+escpos linespacing 0 # minimal linespacing is always the font height during printing
 escpos --font 1 print <<'EOF'
                                 _                  
                                | |                
@@ -20,7 +20,7 @@ escpos --font 1 print <<'EOF'
                                            | |    
                                            |_|    
 EOF
-escpos linespacing 40
+escpos linespacing # resets to default
 escpos print '42 Market Street'
 escpos print '10115 Berlin | +49 30 555 1042'
 escpos print 'VAT ID: DE123456789'
@@ -57,4 +57,4 @@ escpos emphasize 0
 escpos qrcode 'https://example.com/receipts/1042'
 escpos emphasize 1
 escpos print 'Thank you for shopping at ACME!'
-escpos cut 8
+escpos cut

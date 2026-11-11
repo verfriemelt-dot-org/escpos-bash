@@ -30,7 +30,7 @@ export PRINTER=/dev/usb/lp5
 ./escpos align center
 ./escpos barcode ACME1042
 ./escpos feed 1
-./escpos linespacing 0
+./escpos linespacing 0 # minimal linespacing is always the font height during printing
 ./escpos --font 1 print <<'EOF'
                                 _                  
                                | |                
@@ -41,7 +41,7 @@ export PRINTER=/dev/usb/lp5
                                            | |    
                                            |_|    
 EOF
-./escpos linespacing 40
+./escpos linespacing # resets back to default
 ./escpos print '42 Market Street'
 ./escpos print '10115 Berlin | +49 30 555 1042'
 ./escpos print 'VAT ID: DE123456789'
@@ -78,7 +78,7 @@ printf '%-29s %12s\n' 'Cash received' '20.00 EUR' \
 ./escpos qrcode 'https://example.com/receipts/1042'
 ./escpos emphasize 1
 ./escpos print 'Thank you for shopping at ACME!'
-./escpos cut 8
+./escpos cut
 ```
 
 Run `./escpos help` for the full command list. Bash cannot represent NUL bytes in arguments or variables; use `command NUL` when sending that control byte.
