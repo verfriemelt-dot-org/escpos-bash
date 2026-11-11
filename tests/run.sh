@@ -18,6 +18,7 @@ run_test print/feed_before.sh
 run_test print/feed_after.sh
 run_test print/cut_after.sh
 run_test print/init_before.sh
+run_test source/command.sh
 run_test raw/argument_bytes.sh
 run_test raw/stdin_bytes.sh
 run_test command/control_tokens.sh

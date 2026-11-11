@@ -9,15 +9,6 @@ PRINTER=/dev/usb/lp1 ./escpos print "Hello, printer"
 printf 'Hello from stdin\n' | PRINTER=/dev/usb/lp1 ./escpos print
 ```
 
-Commands include `init`, `feed LINES`, `font 0|1|2`, `linespacing [UNITS]` (0-255 motion units; no value restores the printer default), `speed 0-14` (0 restores the printer default; 1 is slowest and 14 fastest on the TM-T88V), `emphasize 0|1`, `italic 0|1` (model support varies), `underline 0|1|2`, `align left|center|right`, `barcode DATA` (Code 39), `qrcode DATA` (Model 2, size 6, error correction L), `cut [LINES]` (feed the requested number of lines, 6 by default, then full cut), and `status` (prints the printer status page on compatible Epson models). `command` translates control tokens such as `ESC @` and `ESC E 1`; `raw` sends supplied bytes unchanged:
-
-Print speed is model-dependent and can be limited by the printer's print-control mode and operating conditions. If a level near the configured maximum appears to have no effect, try a lower level such as `speed 1`; use `speed 0` to restore the printer's configured default.
-
-```bash
-PRINTER=/dev/usb/lp1 ./escpos command ESC E 1
-PRINTER=/dev/usb/lp1 ./escpos raw $'\x1b@'
-```
-
 Global options can be placed before or after the command: `--init`/`-i`, `--feed-before LINES`/`-b`, `--align ALIGN`, `--emphasize 0|1`, `--italic 0|1`, `--underline 0|1|2`, `--font FONT`/`-f`, `--feed-after LINES`/`-a`, and `--cut`/`-c`. Alignment, emphasis, italic, underline, and font options are applied before the command, regardless of where they appear. For example:
 
 ```bash
@@ -27,6 +18,10 @@ printf 'Receipt\n' | PRINTER=/dev/usb/lp1 ./escpos --feed-before 2 print --feed-
 ## ACME Shop receipt example
 
 The shop, transaction, and tax figures are illustrative. On the TM-T88V with 80 mm paper, Font 0 fits 42 characters per line and Font 1 fits 56. This example uses Font 1 for the item table and Font 0 for the rest. It prints a centered Code 39 barcode and QR code:
+
+<p align="center">
+  <img src="img/demo.png" alt="Printed ACME Shop receipt">
+</p>
 
 ```bash
 export PRINTER=/dev/usb/lp5
@@ -86,7 +81,7 @@ printf '%-29s %12s\n' 'Cash received' '20.00 EUR' \
 ./escpos cut 8
 ```
 
-Run `./escpos --help` for the full command list. Bash cannot represent NUL bytes in arguments or variables; use `command NUL` when sending that control byte.
+Run `./escpos help` for the full command list. Bash cannot represent NUL bytes in arguments or variables; use `command NUL` when sending that control byte.
 
 Run the byte-output tests with:
 

@@ -1,31 +1,27 @@
 #!/usr/bin/env bash
-set -euo pipefail
-
-printer=${PRINTER:-/dev/usb/lp1}
-printer_fd=
 
 help() {
     printf '%s\n' \
         "Usage: PRINTER=/dev/usb/lp1 ${0##*/} [OPTIONS] COMMAND [ARGS...]" \
         '' \
         'Commands:' \
-        '  print [text ...]  Print arguments joined by spaces, or read stdin.' \
-        '  raw [bytes ...]   Send bytes verbatim, or read stdin.' \
-        '  command TOKEN...  Translate control tokens (ESC, GS, etc.) to bytes.' \
-        '  feed LINES        Feed 0-255 lines.' \
-        '  font FONT         Select character font 0, 1, or 2.' \
-        '  linespacing [UNITS] Set line spacing in motion units; no value restores the default.' \
-        '  speed SPEED       Select print speed: 0=printer default, 1-14.' \
-        '  emphasize 0|1     Disable or enable emphasized printing.' \
-        '  italic 0|1        Disable or enable italic printing (model-dependent).' \
-        '  underline 0|1|2   Disable, single, or double underline.' \
-        '  align ALIGN      Set text alignment: left, center, or right.' \
-        '  barcode DATA     Print a Code 39 barcode with text below.' \
-        '  qrcode DATA      Print a Model 2 QR code (size 6, error correction L).' \
-        '  cut [LINES]        Feed before a full cut (default: 6 lines).' \
-        '  init               Initialize the printer (ESC @).' \
-        '  status             Print the printer status report on paper.' \
-        '  --help            Show this help.' \
+        '  print [text ...]     Print arguments joined by spaces, or read stdin.' \
+        '  raw [bytes ...]      Send bytes verbatim, or read stdin.' \
+        '  command TOKEN...     Translate control tokens (ESC, GS, etc.) to bytes.' \
+        '  feed LINES           Feed 0-255 lines.' \
+        '  font FONT            Select character font 0, 1, or 2.' \
+        '  linespacing [UNITS]  Set line spacing in motion units; no value restores the default.' \
+        '  speed SPEED          Select print speed: 0=printer default, 1-14.' \
+        '  emphasize 0|1        Disable or enable emphasized printing.' \
+        '  italic 0|1           Disable or enable italic printing (model-dependent).' \
+        '  underline 0|1|2      Disable, single, or double underline.' \
+        '  align ALIGN          Set text alignment: left, center, or right.' \
+        '  barcode DATA         Print a Code 39 barcode with text below.' \
+        '  qrcode DATA          Print a Model 2 QR code (size 6, error correction L).' \
+        '  cut [LINES]          Feed before a full cut (default: 6 lines).' \
+        '  init                 Initialize the printer (ESC @).' \
+        '  status               Print the printer status report on paper.' \
+        '  help                 Show this help.' \
         '' \
         'Global options (can appear before or after the command):' \
         '  --init,        -i        Initialize before the command.' \
@@ -37,7 +33,7 @@ help() {
         '  --feed-after,  -a LINES  Feed after the command.' \
         '  --cut,         -c        Cut after the command.' \
         '  --font,        -f FONT   Select font before the command.' \
-        '  --                         Stop parsing options; pass remaining arguments literally.' \
+        '  --                       Stop parsing options; pass remaining arguments literally.' \
         '' \
         'Raw control tokens: ESC GS FS DLE NUL SO SI LF CR FF HT.'
 }
@@ -492,4 +488,15 @@ main() {
     run_queue
 }
 
-main "$@"
+escpos() {
+    (
+        set -euo pipefail
+        local printer=${PRINTER:-/dev/usb/lp1}
+        local printer_fd=
+        main "$@"
+    )
+}
+
+if [[ ${BASH_SOURCE[0]} == "$0" ]]; then
+    escpos "$@"
+fi
